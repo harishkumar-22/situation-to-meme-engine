@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Situation-to-Meme Engine</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #121212;
+      color: #e0e0e0;
+      max-width: 650px;
+      margin: 40px auto;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    h1 { text-align: center; color: #ffffff; }
+    textarea {
+      width: 100%;
+      height: 90px;
+      padding: 12px;
+      background: #1e1e1e;
+      color: #fff;
+      border: 1px solid #333;
+      border-radius: 8px;
+      font-size: 16px;
+      box-sizing: border-box;
+      resize: vertical;
+    }
+    button {
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px;
+      background-color: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover { background-color: #4338ca; }
+    #result {
+      margin-top: 30px;
+      text-align: center;
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 8px;
+      display: none;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      margin-top: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .loading { color: #a5b4fc; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <h1>Situation-to-Meme Engine</h1>
+  <textarea id="situation" placeholder="Describe your situation here..."></textarea>
+  <button onclick="generateMeme()">Make My Meme</button>
+
+  <div id="result"></div>
+
+  <script>
+    const API_KEY = "AQ.Ab8RN6L7n9b3D1NXVRtnC-IVhXvVWYDsG9lBHb-6ZGoWdcHfwg";
+
+    async function generateMeme() {
+      const situationInput = document.getElementById('situation').value.trim();
+      const resultDiv = document.getElementById('result');
+
+      if (!situationInput) {
+        alert("Please enter a situation first!");
+        return;
+      }
+
+      resultDiv.style.display = "block";
+      resultDiv.innerHTML = '<p class="loading">Thinking of the best meme template and captions...</p>';
+
+      try {
+        const promptText = `You are a meme generator. Analyze this situation: "${situationInput}". 
+Pick an appropriate Memegen template ID (like 'drake', 'doge', 'distracted-boyfriend', 'brain', 'gru', 'fine', 'change-my-mind', 'buttons', 'two-buttons', 'futurama-fry').
+Write top and bottom captions for the meme.
+
+Return ONLY a raw valid JSON object with no markdown code blocks or additional text:
+{"template": "drake", "topText": "caption 1", "bottomText": "caption 2"}`;
+
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': API_KEY
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }]
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error.message || "API Error");
+        }
+
+        let rawText = data.candidates[0].content.parts[0].text.trim();
+        rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+        const memeData = JSON.parse(rawText);
+
+        const cleanTop = encodeURI(memeData.topText.replace(/ /g, '_').replace(/\?/g, '~q') || '_');
+        const cleanBottom = encodeURI(memeData.bottomText.replace(/ /g, '_').replace(/\?/g, '~q') || '_');
+
+        const imageUrl = `https://api.memegen.link/images/${memeData.template}/${cleanTop}/${cleanBottom}.png`;
+
+        resultDiv.innerHTML = `
+          <h3>Template: ${memeData.template}</h3>
+          <img src="${imageUrl}" alt="Generated Meme" onerror="this.onerror=null; this.src='https://api.memegen.link/images/drake/${cleanTop}/${cleanBottom}.png';" />
+        `;
+      } catch (err) {
+        console.error(err);
+        resultDiv.innerHTML = `<p style="color: #ef4444;">Error generating meme: ${err.message}<br><br><em>If it says "high demand", just wait 2 seconds and click "Make My Meme" again.</em></p>`;
+      }
+    }
+  </script>
+</body>
+</html>
